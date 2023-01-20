@@ -19,7 +19,7 @@ import (
 )
 
 type HTTPClient struct {
-	HttpClient http.Client
+	HTTPClient http.Client
 	Retries    int
 	RetryWait  int
 }
@@ -31,6 +31,11 @@ func NewHTTPClient(httpsRoots []*x509.Certificate, insecure bool) HTTPClient {
 		maxIdleConns        = 100
 		idleConnTimeout     = 90 * time.Second
 		tlsHandshakeTimeout = 10 * time.Second
+	)
+
+	const (
+		retries   = 8
+		retryWait = 1
 	)
 
 	roots := x509.NewCertPool()
@@ -48,9 +53,9 @@ func NewHTTPClient(httpsRoots []*x509.Certificate, insecure bool) HTTPClient {
 
 	// setup client with values taken from http.DefaultTransport + RootCAs
 	return HTTPClient{
-		Retries:   8,
-		RetryWait: 1,
-		HttpClient: http.Client{
+		Retries:   retries,
+		RetryWait: retryWait,
+		HTTPClient: http.Client{
 			Transport: (&http.Transport{
 				Proxy: http.ProxyFromEnvironment,
 				DialContext: (&net.Dialer{
@@ -68,24 +73,30 @@ func NewHTTPClient(httpsRoots []*x509.Certificate, insecure bool) HTTPClient {
 	}
 }
 
-// Wrapper for DownloadObject to deal with retries
+// Wrapper for DownloadObject to deal with retries.
 func (h *HTTPClient) Download(url *url.URL) ([]byte, error) {
 	var ret []byte
+
 	var err error
+
 	for iter := 0; iter < h.Retries; iter++ {
-		ret, err = DownloadObject(h.HttpClient, url)
+		ret, err = DownloadObject(h.HTTPClient, url)
 		if err == nil {
 			break
 		}
+
 		time.Sleep(time.Second * time.Duration(h.RetryWait))
 	}
+
 	if len(ret) == 0 {
 		return nil, fmt.Errorf("hit retries limit")
 	}
+
 	return ret, nil
 }
 
 func DownloadObject(client http.Client, url *url.URL) ([]byte, error) {
+	// nolint:godox
 	// TODO: is this needed here?
 	if stlog.Level() != stlog.InfoLevel {
 		CheckEntropy()
@@ -136,6 +147,7 @@ func DownloadObject(client http.Client, url *url.URL) ([]byte, error) {
 func ParsePrivisioningURLs(hostCfg *opts.HostCfg, url *url.URL) *url.URL {
 	if strings.Contains(url.String(), "$ID") {
 		stlog.Debug("replacing $ID with identity provided by the Host configuration")
+
 		url, _ = url.Parse(strings.ReplaceAll(url.String(), "$ID", *hostCfg.ID))
 	}
 
@@ -144,5 +156,6 @@ func ParsePrivisioningURLs(hostCfg *opts.HostCfg, url *url.URL) *url.URL {
 
 		url, _ = url.Parse(strings.ReplaceAll(url.String(), "$AUTH", *hostCfg.Auth))
 	}
+
 	return url
 }

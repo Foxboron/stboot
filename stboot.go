@@ -519,16 +519,17 @@ func markCurrentOSpkg(pkgPath string) {
 }
 
 const (
-	errDownload    = Error("download failed")
-	errNetworkLoad = Error("network load failed")
+	errDownload = Error("download failed")
 )
 
 // get an ospkg
+// nolint:funlen
 func fetchOspkg(client network.HTTPClient, hostCfg *opts.HostCfg) (*ospkgSampl, error) {
 	var sample ospkgSampl
 
 	if len(*hostCfg.ProvisioningURLs) == 0 {
 		stlog.Debug("no provisioning URLs")
+
 		return nil, errDownload
 	}
 
@@ -540,19 +541,23 @@ func fetchOspkg(client network.HTTPClient, hostCfg *opts.HostCfg) (*ospkgSampl, 
 		dBytes, err := client.Download(url)
 		if err != nil {
 			stlog.Debug("Skip %s: %v", url.String(), err)
+
 			continue
 		}
 
 		descriptor, err := ReadOspkg(dBytes)
 		if err != nil {
 			stlog.Debug("Skip %s: %v", url.String(), err)
+
 			continue
 		}
 
 		stlog.Debug("Parsing OS package URL form descriptor")
 
-		filename, pkgURL, ok := ValidatePkgUrl(descriptor.PkgURL)
+		filename, pkgURL, ok := ValidatePkgURL(descriptor.PkgURL)
+		// nolint
 		if ok {
+
 			continue
 		}
 
@@ -602,34 +607,40 @@ func ReadOspkg(b []byte) (*ospkg.Descriptor, error) {
 	if err = descriptor.Validate(); err != nil {
 		return nil, err
 	}
+
 	return descriptor, nil
 }
 
-func ValidatePkgUrl(pkgurl string) (string, *url.URL, bool) {
+func ValidatePkgURL(pkgurl string) (string, *url.URL, bool) {
 	stlog.Debug("Parsing OS package URL form descriptor")
 
 	if pkgurl == "" {
 		stlog.Debug("Skip %s: no OS package URL provided in descriptor")
+
 		return "", nil, false
 	}
 
 	pkgURL, err := url.Parse(pkgurl)
 	if err != nil {
 		stlog.Debug("Skip %s: %v", pkgurl, err)
+
 		return "", nil, false
 	}
 
 	s := pkgURL.Scheme
 	if s == "" || s != "http" && s != "https" {
 		stlog.Debug("Skip %s: missing or unsupported scheme in OS package URL %s", pkgURL.String())
+
 		return "", nil, false
 	}
 
 	filename := filepath.Base(pkgURL.Path)
 	if ext := filepath.Ext(filename); ext != ospkg.OSPackageExt {
 		stlog.Debug("Skip %s: package URL must contain a path to a %s file: %s", ospkg.OSPackageExt, pkgURL.String())
+
 		return "", nil, false
 	}
+
 	return filename, pkgURL, true
 }
 
